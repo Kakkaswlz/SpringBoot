@@ -1,0 +1,128 @@
+package com.kauaSantos.cadastro.services;
+
+import java.util.List;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.stereotype.Service;
+
+
+import org.springframework.mail.SimpleMailMessage;
+import org.springframework.mail.javamail.JavaMailSender;
+
+import com.kauaSantos.cadastro.entities.Usuario;
+import com.kauaSantos.cadastro.repositories.UsuarioRepository;
+
+@Service
+public class UsuarioService {
+
+    @Autowired
+    private UsuarioRepository repository;
+
+    @Autowired
+    private BCryptPasswordEncoder passwordEncoder;
+
+    @Autowired
+    private JavaMailSender mailSender;
+
+    // LISTAR USUÁRIOS
+    public List<Usuario> listarTodos() {
+        return repository.findAll();
+    }
+
+    // CADASTRAR USUÁRIO
+    public Usuario cadastrar(Usuario usuario) {
+        usuario.setSenha(passwordEncoder.encode(usuario.getSenha()));
+        return repository.save(usuario);
+    }
+
+    // DELETAR USUÁRIO
+    public boolean deletar(Long id) {
+
+        if (!repository.existsById(id)) {
+            return false;
+        }
+
+        repository.deleteById(id);
+        return true;
+    }
+
+    // ATUALIZAR USUÁRIO
+    public Usuario atualizar(Long id, Usuario dados) {
+
+        Usuario existente = repository.findById(id).orElse(null);
+
+        if (existente == null) {
+            return null;
+        }
+
+        existente.setNome(dados.getNome());
+        existente.setEmail(dados.getEmail());
+        existente.setBairro(dados.getBairro());
+        existente.setEndereco(dados.getEndereco());
+        existente.setComplemento(dados.getComplemento());
+        existente.setCidade(dados.getCidade());
+
+        return repository.save(existente);
+    }
+
+    // LOGIN
+    public Usuario login(String email, String senha) {
+
+        Usuario usuario = repository.findByEmail(email);
+
+        if (usuario == null) {
+            return null;
+        }
+
+        if (!passwordEncoder.matches(senha, usuario.getSenha())) {
+            return null;
+        }
+
+        return usuario;
+    }
+
+    // ENVIAR EMAIL DE RECUPERAÇÃO
+    public boolean enviarEmailRecuperacao(String email) {
+
+        Usuario usuario = repository.findByEmail(email);
+
+        if (usuario != null) {
+
+            String link = "http://127.0.0.1:5500/redefinir-senha.html?email=" + email;
+
+            SimpleMailMessage mensagem = new SimpleMailMessage();
+            mensagem.setTo(email);
+            mensagem.setSubject("Recuperação de Senha - DevSenai");
+            mensagem.setText(
+                    "Olá " + usuario.getNome() + ",\n\n" +
+                    "Clique no link abaixo para criar uma nova senha:\n" +
+                    link
+            );
+
+            mailSender.send(mensagem);
+
+            System.out.println("Email enviado para: " + email);
+
+            return true;
+        }
+
+        return false;
+    }
+
+    // REDEFINIR SENHA
+    public boolean redefinirSenha(String email, String novaSenha) {
+
+        Usuario usuario = repository.findByEmail(email);
+
+        if (usuario != null) {
+
+            usuario.setSenha(passwordEncoder.encode(novaSenha));
+            repository.save(usuario);
+
+            return true;
+        }
+
+        return false;
+    }
+}
